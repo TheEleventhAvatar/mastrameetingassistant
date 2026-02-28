@@ -4,6 +4,17 @@ import { LibSQLStore } from "@mastra/libsql";
 import { registerApiRoute } from "@mastra/core/server";
 import { meetingAssistant } from "./agents/meeting-assistant";
 import { bot } from "../chat";
+import { initScheduler, scheduleTask, registerTaskHandler } from "../scheduler";
+
+// Boot the scheduler (creates table + starts 30s polling)
+initScheduler();
+
+// Register the follow-up handler: posts a message to the Slack thread
+registerTaskHandler("follow-up", async (payload) => {
+  const { threadId, message } = payload as { threadId: string; message: string };
+  const slack = bot.getAdapter("slack");
+  await slack.postMessage(threadId, { markdown: message });
+});
 
 export const mastra = new Mastra({
   agents: { meetingAssistant },
@@ -62,6 +73,16 @@ export const mastra = new Mastra({
 
             const result = await meetingAssistant.generate(prompt);
             await slack.postMessage(threadId, { markdown: result.text });
+
+            // Schedule a follow-up message for when the meeting ends
+            if (payload.payload.endTime) {
+              scheduleTask(
+                `Follow up: ${attendee.name}`,
+                "follow-up",
+                payload.payload.endTime,
+                { threadId, message: "The meeting should be wrapping up! How did it go?" },
+              );
+            }
           }).catch((err) => {
             console.error("[cal] failed to post brief:", err);
           });
