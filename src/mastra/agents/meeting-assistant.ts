@@ -1,4 +1,5 @@
 import { Agent } from "@mastra/core/agent";
+import { Memory } from "@mastra/memory";
 import { searchWeb } from "../tools/research-tools";
 
 export const meetingAssistant = new Agent({
@@ -22,4 +23,11 @@ export const meetingAssistant = new Agent({
   `,
   model: "anthropic/claude-sonnet-4-5",
   tools: { searchWeb },
+  // Message history: keeps the last 10 messages in context
+  // so the agent remembers what was said earlier in the conversation
+  memory: new Memory({
+    options: {
+      lastMessages: 10,
+    },
+  }),
 });

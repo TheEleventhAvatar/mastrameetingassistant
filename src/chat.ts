@@ -8,7 +8,7 @@ export const bot = new Chat({
   adapters: {
     slack: createSlackAdapter(),
   },
-  // In memory for local dev
+  // In memory for local dev storage
   // move to redis backed in a prod deployment
   // @chat-adapter/state-redis
   state: createMemoryState(),
@@ -18,13 +18,26 @@ bot.onNewMention(async (thread, message) => {
   await thread.subscribe();
   await thread.startTyping();
 
-  const result = await meetingAssistant.generate(message.text);
+  // Pass memory context so the agent remembers this conversation
+  // thread: scopes messages to this specific Slack thread
+  // resource: scopes to the channel (shared context across threads)
+  const result = await meetingAssistant.generate(message.text, {
+    memory: {
+      thread: thread.id,
+      resource: thread.channelId,
+    },
+  });
   await thread.post(result.text);
 });
 
 bot.onSubscribedMessage(async (thread, message) => {
   await thread.startTyping();
 
-  const result = await meetingAssistant.generate(message.text);
+  const result = await meetingAssistant.generate(message.text, {
+    memory: {
+      thread: thread.id,
+      resource: thread.channelId,
+    },
+  });
   await thread.post(result.text);
 });
