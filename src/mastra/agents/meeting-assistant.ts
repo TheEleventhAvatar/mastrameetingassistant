@@ -23,11 +23,29 @@ export const meetingAssistant = new Agent({
   `,
   model: "anthropic/claude-sonnet-4-5",
   tools: { searchWeb },
-  // Message history: keeps the last 10 messages in context
-  // so the agent remembers what was said earlier in the conversation
   memory: new Memory({
     options: {
+      // Message history: keeps the last 10 messages in context
+      // so the agent remembers what was said earlier in the conversation
       lastMessages: 10,
+
+      // Working memory: a persistent scratchpad the agent updates over time.
+      // The agent automatically fills this in as it learns about you.
+      // Scoped to resource — we use a fixed resource ID so your profile
+      // persists across all channels and threads.
+      workingMemory: {
+        enabled: true,
+        template: `# User Profile
+- Name:
+- Role:
+- Company:
+
+# Preferences
+- Communication style:
+- Meeting prep preferences:
+- Topics of interest:
+`,
+      },
     },
   }),
 });

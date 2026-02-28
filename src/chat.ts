@@ -24,7 +24,9 @@ bot.onNewMention(async (thread, message) => {
   const result = await meetingAssistant.generate(message.text, {
     memory: {
       thread: thread.id,
-      resource: thread.channelId,
+      // Fixed resource ID so working memory (your profile) is shared
+      // across all channels, not isolated per channel
+      resource: "user",
     },
   });
   await thread.post(result.text);
@@ -36,7 +38,9 @@ bot.onSubscribedMessage(async (thread, message) => {
   const result = await meetingAssistant.generate(message.text, {
     memory: {
       thread: thread.id,
-      resource: thread.channelId,
+      // Fixed resource ID so working memory (your profile) is shared
+      // across all channels, not isolated per channel
+      resource: "user",
     },
   });
   await thread.post(result.text);
