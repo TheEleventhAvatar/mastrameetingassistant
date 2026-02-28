@@ -1,4 +1,5 @@
 import { Agent } from "@mastra/core/agent";
+import { searchWeb } from "../tools/research-tools";
 
 export const meetingAssistant = new Agent({
   id: "meeting-assistant",
@@ -20,4 +21,5 @@ export const meetingAssistant = new Agent({
     - If you don't know something, say so — don't make things up
   `,
   model: "anthropic/claude-sonnet-4-5",
+  tools: { searchWeb },
 });
