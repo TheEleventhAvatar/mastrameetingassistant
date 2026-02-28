@@ -23,6 +23,52 @@ export const mastra = new Mastra({
           return bot.webhooks.slack(c.req.raw);
         },
       }),
+      registerApiRoute("/webhooks/cal", {
+        method: "POST",
+        handler: async (c) => {
+          const payload = await c.req.json();
+          const triggerEvent = payload.triggerEvent;
+
+          if (triggerEvent !== "BOOKING_CREATED") {
+            return c.json({ ok: true, skipped: true });
+          }
+
+          const attendee = payload.payload?.attendees?.[0];
+          if (!attendee?.email) {
+            return c.json({ error: "No attendee found" }, 400);
+          }
+
+          const channelId = process.env.SLACK_CHANNEL_ID;
+          if (!channelId) {
+            return c.json({ error: "SLACK_CHANNEL_ID not set" }, 500);
+          }
+
+          // Research and post asynchronously so Cal.com doesn't time out
+          const channel = bot.channel(`slack:${channelId}`);
+
+          console.log("[cal] booking received:", attendee.name, attendee.email);
+
+          const slack = bot.getAdapter("slack");
+
+          channel.post(`Researching *${attendee.name}* for upcoming meeting...`).then(async (sent) => {
+            const threadId = `slack:${channelId}:${sent.id}`;
+
+            const prompt = [
+              `I have a meeting coming up with ${attendee.name} (${attendee.email}).`,
+              `Event: ${payload.payload.title ?? "Meeting"}`,
+              `Time: ${payload.payload.startTime}`,
+              `Research this person and give me a concise meeting brief.`,
+            ].join("\n");
+
+            const result = await meetingAssistant.generate(prompt);
+            await slack.postMessage(threadId, { markdown: result.text });
+          }).catch((err) => {
+            console.error("[cal] failed to post brief:", err);
+          });
+
+          return c.json({ ok: true });
+        },
+      }),
     ],
   },
 });
