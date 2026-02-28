@@ -1,5 +1,7 @@
 import { Agent } from "@mastra/core/agent";
 import { Memory } from "@mastra/memory";
+import { LibSQLVector } from "@mastra/libsql";
+import { fastembed } from "@mastra/fastembed";
 import { searchWeb } from "../tools/research-tools";
 
 export const meetingAssistant = new Agent({
@@ -24,10 +26,28 @@ export const meetingAssistant = new Agent({
   model: "anthropic/claude-sonnet-4-5",
   tools: { searchWeb },
   memory: new Memory({
+    // Vector store for semantic recall — stores message embeddings
+    // so the agent can search past conversations by meaning
+    vector: new LibSQLVector({
+      id: "memory-vector",
+      url: "file:./mastra.db",
+    }),
+
+    // Local embedding model — no API key needed
+    embedder: fastembed,
+
     options: {
-      // Message history: keeps the last 10 messages in context
-      // so the agent remembers what was said earlier in the conversation
+      // Episodic memory (short-term): keeps the last 10 messages in context
+      // so the agent remembers what was said earlier in the conversation.
       lastMessages: 10,
+
+      // Semantic memory (long-term): searches past conversations by meaning
+      // using vector embeddings. If someone mentioned a topic weeks ago,
+      // the agent can find it.
+      semanticRecall: {
+        topK: 3,          // Retrieve the 3 most relevant past messages
+        messageRange: 2,   // Include 2 messages of surrounding context per match
+      },
 
       // Working memory: a persistent scratchpad the agent updates over time.
       // The agent automatically fills this in as it learns about you.
