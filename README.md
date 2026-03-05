@@ -1,27 +1,248 @@
-# meeting-assistant
+# Meeting Assistant
 
-Welcome to your new [Mastra](https://mastra.ai/) project! We're excited to see what you'll build.
+A personal AI assistant that preps you for every meeting — built with [Mastra](https://mastra.ai/), the TypeScript framework for AI agents.
+
+This is the companion repo for the YouTube video: **Build a Personal AI Assistant That Actually Works**. Follow along to build an agent that researches your meeting attendees, posts briefs to Slack, and schedules follow-ups — all automatically.
+
+## What It Does
+
+1. Someone books a call on [Cal.com](https://refer.cal.com/dgalarza-ucac)*
+2. The agent researches who they are using web search
+3. A meeting brief gets posted to your Slack channel
+4. You chat with the agent in-thread to ask follow-up questions
+5. After the meeting ends, it reminds you to follow up
+6. Over time, it learns your preferences through memory
+
+```mermaid
+sequenceDiagram
+    participant Cal as Cal.com
+    participant Mastra as Mastra Server
+    participant Agent as Meeting Assistant
+    participant Exa as Exa Search
+    participant Slack as Slack
+
+    Cal->>Mastra: Booking webhook
+    Mastra->>Slack: "Researching [name]..."
+    Mastra->>Agent: Generate meeting brief
+    Agent->>Exa: Search person & company
+    Exa-->>Agent: Research results
+    Agent-->>Mastra: Meeting brief
+    Mastra->>Slack: Post brief in thread
+    Mastra->>Mastra: Schedule follow-up
+
+    Note over Mastra: After meeting ends...
+    Mastra->>Slack: "How did it go?"
+```
+
+## Architecture
+
+```mermaid
+graph TB
+    subgraph External Services
+        Cal[Cal.com]
+        SlackAPI[Slack API]
+        ExaAPI[Exa Search API]
+    end
+
+    subgraph "Mastra Server (localhost:4111)"
+        Webhooks["/webhooks/cal<br>/webhooks/slack"]
+        AgentCore[Meeting Assistant Agent<br>Claude Sonnet]
+        Tools[Web Search Tool]
+        Scheduler[Task Scheduler<br>30s polling]
+    end
+
+    subgraph Chat Layer
+        ChatSDK[Chat SDK]
+        SlackAdapter[Slack Adapter]
+    end
+
+    subgraph Memory
+        Episodic[Episodic<br>Last 10 messages]
+        Semantic[Semantic Recall<br>Vector search]
+        Working[Working Memory<br>User profile]
+    end
+
+    subgraph Storage
+        MastraDB[(mastra.db<br>LibSQL)]
+        SchedulerDB[(scheduler.db<br>SQLite)]
+    end
+
+    Cal -->|BOOKING_CREATED| Webhooks
+    SlackAPI -->|Events| Webhooks
+    Webhooks --> ChatSDK
+    ChatSDK --> SlackAdapter
+    SlackAdapter --> AgentCore
+    Webhooks -->|Cal booking| AgentCore
+    AgentCore --> Tools
+    Tools --> ExaAPI
+    AgentCore --- Episodic
+    AgentCore --- Semantic
+    AgentCore --- Working
+    Semantic --> MastraDB
+    Working --> MastraDB
+    Scheduler --> SchedulerDB
+    Scheduler -->|Follow-ups| SlackAPI
+    AgentCore -->|Responses| SlackAPI
+```
+
+## Key Concepts
+
+Each section maps to a concept covered in the video.
+
+### Agent + Tools
+
+The core agent (`src/mastra/agents/meeting-assistant.ts`) is configured with instructions, a model, tools, and memory. Tools give the agent the ability to _do things_ — in this case, search the web via the Exa API.
+
+```mermaid
+graph LR
+    Agent[Meeting Assistant] -->|uses| Tool[searchWeb]
+    Tool -->|calls| Exa[Exa API]
+    Exa -->|returns| Results[Titles, URLs, Text]
+```
+
+### Memory (Three Layers)
+
+Mastra's memory system gives the agent context across conversations:
+
+```mermaid
+graph TB
+    subgraph "Memory System"
+        E[Episodic Memory]
+        S[Semantic Memory]
+        W[Working Memory]
+    end
+
+    E -->|"Last 10 messages"| Short[Short-term context<br>within a thread]
+    S -->|"Vector similarity search"| Long[Long-term recall<br>across all conversations]
+    W -->|"Persistent scratchpad"| Profile[User profile<br>shared across channels]
+```
+
+| Layer | What it does | Scoped to |
+|-------|-------------|-----------|
+| **Episodic** | Keeps the last 10 messages in context | Thread |
+| **Semantic** | Vector search over all past messages — finds topics by meaning | Global |
+| **Working** | Persistent user profile the agent updates over time | User (shared) |
+
+### Webhooks
+
+Two webhook endpoints handle external events:
+
+- **`/webhooks/slack`** — Slack events (mentions, messages)
+- **`/webhooks/cal`** — Cal.com booking creation
+
+### Task Scheduling
+
+A simple polling scheduler (`src/scheduler.ts`) handles time-delayed actions like post-meeting follow-ups. Tasks are stored in SQLite via Drizzle ORM and checked every 30 seconds.
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: scheduleTask()
+    pending --> running: scheduledFor <= now
+    running --> completed: handler succeeds
+    running --> failed: handler throws
+```
+
+### Slack Integration (Chat SDK)
+
+The [Chat SDK](https://github.com/nichochar/chat-sdk) provides a platform-agnostic interface for bot communication. The Slack adapter handles event subscriptions, threading, and typing indicators.
 
 ## Getting Started
 
-Start the development server:
+### Prerequisites
 
-```shell
+- Node.js >= 22.13
+- A Slack workspace where you can install apps
+- API keys for Anthropic, Exa, and (optionally) Cal.com
+
+### 1. Clone and install
+
+```bash
+git clone https://github.com/dgalarza/meeting-assistant.git
+cd meeting-assistant
+npm install
+```
+
+### 2. Set up environment variables
+
+```bash
+cp .env.example .env
+```
+
+Fill in your `.env`:
+
+| Variable | Description | Where to get it |
+|----------|-------------|-----------------|
+| `ANTHROPIC_API_KEY` | Claude API key | [console.anthropic.com](https://console.anthropic.com/) |
+| `SLACK_BOT_TOKEN` | Slack bot token (`xoxb-...`) | Slack app settings > OAuth |
+| `SLACK_SIGNING_SECRET` | Webhook signature verification | Slack app settings > Basic Information |
+| `EXA_API_KEY` | Web search API | [exa.ai](https://exa.ai/) |
+| `SLACK_CHANNEL_ID` | Channel for meeting briefs | Right-click channel in Slack > Copy link |
+
+### 3. Create the Slack app
+
+Go to [api.slack.com/apps](https://api.slack.com/apps) and create a new app **from manifest**. Paste the contents of `slack-app-manifest.json`, then update the URLs after setting up ngrok (next step).
+
+Install the app to your workspace and copy the **Bot Token** and **Signing Secret** into your `.env`.
+
+### 4. Expose your local server
+
+The Slack and Cal.com webhooks need a public URL. Use [ngrok](https://ngrok.com/) to tunnel to your local server:
+
+```bash
+ngrok http 4111
+```
+
+Copy the `https://...ngrok-free.app` URL and update:
+- **Slack app settings** > Event Subscriptions > Request URL: `https://YOUR_URL/webhooks/slack`
+- **Slack app settings** > Interactivity > Request URL: `https://YOUR_URL/webhooks/slack`
+- **[Cal.com](https://refer.cal.com/dgalarza-ucac)*** > Settings > Developer > Webhooks: `https://YOUR_URL/webhooks/cal` (event: Booking Created)
+
+### 5. Initialize the database
+
+```bash
+npx drizzle-kit push
+```
+
+### 6. Start the dev server
+
+```bash
 npm run dev
 ```
 
-Open [http://localhost:4111](http://localhost:4111) in your browser to access [Mastra Studio](https://mastra.ai/docs/getting-started/studio). It provides an interactive UI for building and testing your agents, along with a REST API that exposes your Mastra application as a local service. This lets you start building without worrying about integration right away.
+Mastra Studio is now running at [http://localhost:4111](http://localhost:4111). Mention your bot in Slack to start chatting, or create a Cal.com booking to trigger the full flow.
 
-You can start editing files inside the `src/mastra` directory. The development server will automatically reload whenever you make changes.
+## Project Structure
 
-## Learn more
+```
+src/
+├── mastra/
+│   ├── index.ts                 # Mastra config, webhooks, scheduler setup
+│   ├── agents/
+│   │   └── meeting-assistant.ts # Agent definition with memory + tools
+│   └── tools/
+│       └── research-tools.ts    # Exa web search tool
+├── chat.ts                      # Slack bot via Chat SDK
+├── scheduler.ts                 # Polling task scheduler
+└── db/
+    ├── index.ts                 # Drizzle database connection
+    └── schema.ts                # scheduled_tasks table schema
+```
 
-To learn more about Mastra, visit our [documentation](https://mastra.ai/docs/). Your bootstrapped project includes example code for [agents](https://mastra.ai/docs/agents/overview), [tools](https://mastra.ai/docs/agents/using-tools), [workflows](https://mastra.ai/docs/workflows/overview), [scorers](https://mastra.ai/docs/evals/overview), and [observability](https://mastra.ai/docs/observability/overview).
+## Scripts
 
-If you're new to AI agents, check out our [course](https://mastra.ai/course) and [YouTube videos](https://youtube.com/@mastra-ai). You can also join our [Discord](https://discord.gg/BTYqqHKUrf) community to get help and share your projects.
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start Mastra dev server with hot reload |
+| `npm run build` | Build for production |
+| `npm start` | Start production server |
 
-## Deploy on Mastra Cloud
+## Learn More
 
-[Mastra Cloud](https://cloud.mastra.ai/) gives you a serverless agent environment with atomic deployments. Access your agents from anywhere and monitor performance. Make sure they don't go off the rails with evals and tracing.
+- [Mastra Documentation](https://mastra.ai/docs/)
+- [Mastra Memory](https://mastra.ai/docs/memory/overview)
+- [Chat SDK](https://github.com/nichochar/chat-sdk)
+- [Exa API](https://docs.exa.ai/)
 
-Check out the [deployment guide](https://mastra.ai/docs/deployment/overview) for more details.
+## Disclosure
+
+*Some links in this README are affiliate links. If you sign up through them, I may earn a small commission at no extra cost to you. This helps support the channel. I only recommend tools I actually use.
