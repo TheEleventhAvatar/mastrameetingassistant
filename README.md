@@ -144,7 +144,7 @@ stateDiagram-v2
 
 ### Slack Integration (Chat SDK)
 
-The [Chat SDK](https://github.com/nichochar/chat-sdk) provides a platform-agnostic interface for bot communication. The Slack adapter handles event subscriptions, threading, and typing indicators.
+The [Chat SDK](https://chat-sdk.dev/) provides a platform-agnostic interface for bot communication. The Slack adapter handles event subscriptions, threading, and typing indicators.
 
 ## Getting Started
 
@@ -240,7 +240,7 @@ src/
 
 - [Mastra Documentation](https://mastra.ai/docs/)
 - [Mastra Memory](https://mastra.ai/docs/memory/overview)
-- [Chat SDK](https://github.com/nichochar/chat-sdk)
+- [Chat SDK](https://chat-sdk.dev/)
 - [Exa API](https://docs.exa.ai/)
 
 ## Disclosure
