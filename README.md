@@ -4,6 +4,8 @@ A personal AI assistant that preps you for every meeting — built with [Mastra]
 
 This is the companion repo for the YouTube video: **Build a Personal AI Assistant That Actually Works**. Follow along to build an agent that researches your meeting attendees, posts briefs to Slack, and schedules follow-ups — all automatically.
 
+Need help building AI agents for your team? [Learn about my coaching and AI engineering services](https://www.damiangalarza.com/ai-agents/?utm_source=github&utm_medium=readme&utm_campaign=meeting-assistant).
+
 ## What It Does
 
 1. Someone books a call on [Cal.com](https://refer.cal.com/dgalarza-ucac)*
@@ -238,6 +240,7 @@ src/
 
 ## Learn More
 
+- [AI Agent Coaching & Engineering Services](https://www.damiangalarza.com/ai-agents/?utm_source=github&utm_medium=readme&utm_campaign=meeting-assistant)
 - [Mastra Documentation](https://mastra.ai/docs/)
 - [Mastra Memory](https://mastra.ai/docs/memory/overview)
 - [Chat SDK](https://chat-sdk.dev/)
