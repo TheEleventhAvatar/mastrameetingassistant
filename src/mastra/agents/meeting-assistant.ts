@@ -23,7 +23,7 @@ export const meetingAssistant = new Agent({
     - Remember context from previous conversations
     - If you don't know something, say so — don't make things up
   `,
-  model: "anthropic/claude-sonnet-4-5",
+  model: "openai/gpt-4",
   tools: { searchWeb },
   memory: new Memory({
     // Vector store for semantic recall — stores message embeddings

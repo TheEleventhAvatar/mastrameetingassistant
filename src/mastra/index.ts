@@ -7,20 +7,20 @@ import { bot } from "../chat";
 import { initScheduler, scheduleTask, registerTaskHandler } from "../scheduler";
 
 // Boot the scheduler (creates table + starts 30s polling)
-initScheduler();
+// initScheduler();
 
 // Register the follow-up handler: posts a message to the Slack thread
-registerTaskHandler("follow-up", async (payload) => {
-  const { threadId, message } = payload as { threadId: string; message: string };
-  const slack = bot.getAdapter("slack");
-  await slack.postMessage(threadId, { markdown: message });
-});
+// registerTaskHandler("follow-up", async (payload) => {
+//   const { threadId, message } = payload as { threadId: string; message: string };
+//   const slack = bot.getAdapter("slack");
+//   await slack.postMessage(threadId, { markdown: message });
+// });
 
 export const mastra = new Mastra({
   agents: { meetingAssistant },
   storage: new LibSQLStore({
     id: "mastra-storage",
-    url: "file:./mastra.db",
+    url: "file:./scheduler.db",
   }),
   logger: new PinoLogger({
     name: "Mastra",
